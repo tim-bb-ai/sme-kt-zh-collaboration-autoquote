@@ -13,7 +13,7 @@ export const Header: FunctionComponent = () => {
     return (
         <header className="bg-card">
             <div className="page-container flex min-h-18 flex-wrap items-center gap-x-6 gap-y-2 py-2">
-                <img src={APP_CONFIG.logo} alt={APP_CONFIG.logoAlt} className="h-5 w-auto max-w-full" />
+                <img src={APP_CONFIG.logo} alt={APP_CONFIG.logoAlt} style={{ height: APP_CONFIG.logoHeaderHeightPx }} className="w-auto max-w-full" />
                 <span aria-hidden="true" className="h-7 w-px bg-input" />
                 <span className="font-heading text-xl font-semibold tracking-[-0.02em] text-ink">{APP_CONFIG.name}</span>
                 <nav aria-label={t("header.mainNavigation")} className="ml-auto flex flex-wrap gap-6">

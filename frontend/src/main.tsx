@@ -1,12 +1,13 @@
 import ReactDOM from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { BRAND_COLORS } from "@/config";
+import { BRAND_COLORS, BRAND_FONT_FAMILY, BRAND_FONT_URLS } from "@/config";
 import { initTranslation } from "@/lib/lang/i18n";
-import { applyBrandColors } from "@/lib/theme";
+import { applyBrandColors, applyBrandFont } from "@/lib/theme";
 import { routeTree } from "@/routeTree.gen";
 
 initTranslation();
 applyBrandColors(BRAND_COLORS);
+applyBrandFont(BRAND_FONT_FAMILY, BRAND_FONT_URLS);
 
 const router = createRouter({
     routeTree,

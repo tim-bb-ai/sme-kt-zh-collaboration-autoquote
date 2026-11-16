@@ -62,6 +62,12 @@ product_controller = ProductController(product_database=product_database)
 
 branding = Branding.model_validate_json((BRANDING_FOLDER / "branding.json").read_text(encoding="utf-8"))
 branding_logo = (BRANDING_FOLDER / "logo.png").read_bytes()
+# Licensed font files are git-ignored, so a checkout may lack them; the quote PDF then falls back to Helvetica.
+branding_font_files = (
+    {weight: BRANDING_FOLDER / file for weight, file in branding.font.files.items() if (BRANDING_FOLDER / file).is_file()}
+    if branding.font
+    else {}
+)
 
 llm_base_url = os.getenv("LLM_BASE_URL") or None
 llm_api_key = os.environ["LLM_API_KEY"]
@@ -90,7 +96,7 @@ quote_controller = QuoteController(
     product_database=product_database,
     document_file_storage=document_file_storage,
     document_readers=document_readers,
-    quote_renderer=ReportLabQuoteRenderer(branding=branding, logo=branding_logo),
+    quote_renderer=ReportLabQuoteRenderer(branding=branding, logo=branding_logo, font_files=branding_font_files),
     llm=llm,
 )
 extraction_database = JSONFileExtractionDatabase(json_file_path=DATA_FOLDER / "extractions.json")

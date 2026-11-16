@@ -24,3 +24,6 @@ notebooks/*
 
 # OSX-specific
 .DS_Store
+
+# Saved data sets of other companies (switch by renaming the folder to data/)
+data_*/

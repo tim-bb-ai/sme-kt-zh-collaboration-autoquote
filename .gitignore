@@ -11,3 +11,6 @@
 # Code
 AGENTS.md
 CLAUDE.md
+
+# Licensed brand fonts (e.g. Jones for bb trading) must not be published; branding.json falls back to the default fonts without them
+branding/fonts/

@@ -22,8 +22,8 @@ body {
 }
 
 @theme inline {
-    --font-heading: "Space Grotesk", system-ui, sans-serif;
-    --font-sans: "Switzer", system-ui, sans-serif;
+    --font-heading: var(--brand-font, "Space Grotesk"), system-ui, sans-serif;
+    --font-sans: var(--brand-font, "Switzer"), system-ui, sans-serif;
     --font-mono: "Fira Code", ui-monospace, monospace;
     --color-ink: var(--ink);
     --color-surface: var(--surface);
@@ -57,7 +57,8 @@ body {
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* SDSC design system: lavender-grey background, 4px radius. The brand colours (--primary, --ink) come from branding/branding.json. */
+/* SDSC design system: lavender-grey background, 4px radius. The brand colours (--primary, --ink) and the optional brand font
+   (--brand-font) come from branding/branding.json. */
 :root {
     --background: #f4f3f8;
     --foreground: #000000;

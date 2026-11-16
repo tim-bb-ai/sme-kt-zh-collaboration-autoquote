@@ -1,5 +1,6 @@
 from datetime import date
 from io import BytesIO
+from pathlib import Path
 from xml.sax.saxutils import escape
 
 from pydantic import BaseModel
@@ -8,6 +9,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from auto_quote.documents.renderer.quote_renderer import QuoteRenderer
@@ -16,8 +19,11 @@ from auto_quote.models.quote import CURRENCY, Quote, QuoteLanguage, QuoteLine
 
 
 PAGE_MARGIN = 18 * mm
-LOGO_MAX_HEIGHT = 14 * mm
 LOGO_MAX_WIDTH = 70 * mm
+DEFAULT_FONT = "Helvetica"
+DEFAULT_BOLD_FONT = "Helvetica-Bold"
+REGULAR_WEIGHT = 400
+BOLD_WEIGHT = 700
 COLUMN_WIDTHS = [12 * mm, 78 * mm, 16 * mm, 20 * mm, 24 * mm, 24 * mm]
 GREY = colors.HexColor("#6b6b6b")
 LINE_COLOR = colors.HexColor("#d0d0d0")
@@ -84,21 +90,23 @@ QUOTE_LABELS: dict[QuoteLanguage, QuoteLabels] = {
 
 
 class ReportLabQuoteRenderer(QuoteRenderer):
-    def __init__(self, branding: Branding, logo: bytes):
+    # font_files: the brand font's files by weight, only those that exist (licensed fonts may be missing from a checkout).
+    def __init__(self, branding: Branding, logo: bytes, font_files: dict[int, Path] | None = None):
         self.branding = branding
         self.logo = logo
         self.ink_color = colors.HexColor(branding.colors.ink)
+        self.font, self.bold_font = _register_brand_font(branding=branding, font_files=font_files or {})
         styles = getSampleStyleSheet()
-        self.body_style = ParagraphStyle("QuoteBody", parent=styles["BodyText"], fontName="Helvetica", fontSize=9.5, leading=13)
+        self.body_style = ParagraphStyle("QuoteBody", parent=styles["BodyText"], fontName=self.font, fontSize=9.5, leading=13)
         self.small_style = ParagraphStyle("QuoteSmall", parent=self.body_style, fontSize=8, leading=10.5, textColor=GREY)
         self.brand_name_style = ParagraphStyle(
-            "QuoteBrandName", parent=self.body_style, fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=self.ink_color
+            "QuoteBrandName", parent=self.body_style, fontName=self.bold_font, fontSize=13, leading=16, textColor=self.ink_color
         )
         self.title_style = ParagraphStyle(
-            "QuoteTitle", parent=self.body_style, fontName="Helvetica-Bold", fontSize=16, leading=20, spaceAfter=4, textColor=self.ink_color
+            "QuoteTitle", parent=self.body_style, fontName=self.bold_font, fontSize=16, leading=20, spaceAfter=4, textColor=self.ink_color
         )
         self.heading_style = ParagraphStyle(
-            "QuoteHeading", parent=self.body_style, fontName="Helvetica-Bold", fontSize=11, spaceBefore=8, textColor=self.ink_color
+            "QuoteHeading", parent=self.body_style, fontName=self.bold_font, fontSize=11, spaceBefore=8, textColor=self.ink_color
         )
 
     def render(self, quote: Quote, issue_date: date) -> bytes:
@@ -131,7 +139,7 @@ class ReportLabQuoteRenderer(QuoteRenderer):
     def _build_header(self) -> list:
         image_width, image_height = ImageReader(BytesIO(self.logo)).getSize()
         # Square logos are limited by the height, wide wordmarks by the width.
-        scale = min(LOGO_MAX_HEIGHT / image_height, LOGO_MAX_WIDTH / image_width)
+        scale = min(self.branding.logo_height_mm * mm / image_height, LOGO_MAX_WIDTH / image_width)
         header = [
             Image(BytesIO(self.logo), width=image_width * scale, height=image_height * scale, hAlign="LEFT"),
             Spacer(1, 3 * mm),
@@ -151,8 +159,9 @@ class ReportLabQuoteRenderer(QuoteRenderer):
         table.setStyle(
             TableStyle(
                 [
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTNAME", (-1, -1), (-1, -1), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 0), (-1, -1), self.font),
+                    ("FONTNAME", (0, 0), (-1, 0), self.bold_font),
+                    ("FONTNAME", (-1, -1), (-1, -1), self.bold_font),
                     ("FONTSIZE", (0, 0), (-1, -1), 9),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("ALIGN", (2, 0), (2, -1), "RIGHT"),
@@ -177,6 +186,21 @@ class ReportLabQuoteRenderer(QuoteRenderer):
             _format_amount(line.unit_price),
             _format_amount(line.total),
         ]
+
+
+# Registers the brand font with the PDF library and returns the regular and bold font names, or Helvetica without a regular weight.
+def _register_brand_font(branding: Branding, font_files: dict[int, Path]) -> tuple[str, str]:
+    if branding.font is None or REGULAR_WEIGHT not in font_files:
+        return DEFAULT_FONT, DEFAULT_BOLD_FONT
+    font_names = {}
+    for weight in (REGULAR_WEIGHT, BOLD_WEIGHT):
+        if weight in font_files:
+            font_names[weight] = f"{branding.font.family}-{weight}"
+            pdfmetrics.registerFont(TTFont(font_names[weight], str(font_files[weight])))
+    regular, bold = font_names[REGULAR_WEIGHT], font_names.get(BOLD_WEIGHT, font_names[REGULAR_WEIGHT])
+    # Lets <b> in paragraphs switch to the bold file.
+    pdfmetrics.registerFontFamily(regular, normal=regular, bold=bold, italic=regular, boldItalic=bold)
+    return regular, bold
 
 
 def _to_markup(text: str) -> str:

@@ -1,10 +1,21 @@
 {
-    "name": "Auto Quote",
-    "description": "Automatic quote generation for SMEs",
-    "details": "",
-    "logoAlt": "Swiss Data Science Center",
+    "name": "bb trading werbeartikel ag",
+    "description": "Offerten automatisch erstellen",
+    "details": "Bernstrasse 90 · CH-8953 Dietikon\n+41 44 745 69 69 · info@bbtrading.ch · bbtrading.ch",
+    "logoAlt": "bb trading",
+    "logoHeightMm": 21.7,
+    "logoHeaderHeightPx": 52,
+    "font": {
+        "family": "Jones",
+        "files": {
+            "300": "fonts/Jones-Light.ttf",
+            "400": "fonts/Jones-Book.ttf",
+            "500": "fonts/Jones-Medium.ttf",
+            "700": "fonts/Jones-Bold.ttf"
+        }
+    },
     "colors": {
-        "primary": "#5561a6",
-        "ink": "#26235c"
+        "primary": "#000000",
+        "ink": "#000000"
     }
 }

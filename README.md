@@ -355,7 +355,9 @@ files must be updated by hand (or deleted).
 - **Branding**: `branding/branding.json` and `branding/logo.png` at the root, read by both parts. The name, description, logo and
   `logoAlt` are used by the app header and page title; the name, `details` (address and contact lines) and logo head every quote PDF. The
   `colors` set the `--primary` and `--ink` CSS variables of the app; `ink` also colours the PDF's name, title, headings and table rules.
-  The logo must be a PNG (the PDF library cannot draw SVG). The quote PDF layout is `ReportLabQuoteRenderer` in `backend/src/auto_quote/documents/renderer/reportlab.py`.
+  The logo must be a PNG (the PDF library cannot draw SVG). Optional fields: `logoHeightMm` (logo height on the quote PDF, default 14),
+  `logoHeaderHeightPx` (logo height in the app header, default 20) and `font` (`family` plus `.ttf` files by weight, paths relative to
+  `branding/`), which replaces the app and PDF fonts. `branding/fonts/` is git-ignored for licensed fonts; without the files the defaults stay. The quote PDF layout is `ReportLabQuoteRenderer` in `backend/src/auto_quote/documents/renderer/reportlab.py`.
 - **Retrieval**: how many similar cases are used (`SIMILAR_DOCUMENTS_LIMIT`) is in `backend/src/auto_quote/controllers/retrieval.py`.
   Embeddings are stored with ChromaDB, embedded in the backend (no Chroma server); the implementation is
   `backend/src/auto_quote/models/chroma/document_vector.py`.
