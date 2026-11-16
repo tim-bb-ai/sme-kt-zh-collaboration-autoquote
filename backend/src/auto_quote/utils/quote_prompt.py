@@ -23,6 +23,7 @@ QUOTE_SYSTEM_PROMPT = (
 class _LLMProductLine(BaseModel):
     product_reference: str
     quantity: float
+    details: str
 
 
 class _LLMExtraLine(BaseModel):
@@ -34,6 +35,9 @@ class _LLMExtraLine(BaseModel):
 
 class _LLMQuote(BaseModel):
     customer: str
+    company: str
+    contact: str
+    salutation: str
     title: str
     scope_of_work: str
     terms: str
@@ -47,6 +51,11 @@ def build_quote_tool() -> dict[str, Any]:
         properties={
             "product_reference": {"type": "string", "description": "Reference of a catalogue product that has a price."},
             "quantity": {"type": "number", "description": "Quantity in the product's unit."},
+            "details": {
+                "type": "string",
+                "description": "Customer-specific addition printed below the catalogue description (e.g. the finishing), "
+                "worded as the business rules say. Empty if there is none.",
+            },
         }
     )
     extra_line_json_schema = build_strict_object(
@@ -67,6 +76,12 @@ def build_quote_tool() -> dict[str, Any]:
         "parameters": build_strict_object(
             properties={
                 "customer": {"type": "string", "description": "Organisation and contact person as given in the request."},
+                "company": {"type": "string", "description": "Name of the customer's organisation only, as given in the request."},
+                "contact": {
+                    "type": "string",
+                    "description": "Contact person for the address, worded as the business rules say. Empty if unknown.",
+                },
+                "salutation": {"type": "string", "description": "Salutation line of the quote, worded as the business rules say."},
                 "title": {"type": "string", "description": "Short subject of the quote."},
                 "scope_of_work": {"type": "string", "description": "What will be done, written for the customer, without prices."},
                 "terms": {"type": "string", "description": "Validity and payment terms from the business rules."},
@@ -94,7 +109,8 @@ def build_quote_prompt(
         f"- Extra margin: {configuration.extra_margin_percentage:g} %. The tool adds it to every unit price, "
         f"so use the catalogue prices and the rates from the business rules as they are. Never mention the margin.\n\n"
         f"How to build the quote:\n"
-        f"- Product lines: catalogue products that have a price, by their product_reference, with the quantity the request needs.\n"
+        f"- Product lines: catalogue products that have a price, by their product_reference, with the quantity the request needs. "
+        f"The catalogue description is printed as it is; put anything specific to this request (e.g. the finishing) in details.\n"
         f"- Extra lines: everything else the request needs (work rated by the business rules, products missing from the catalogue "
         f"or without a price), with a description, quantity, unit and unit price taken from the business rules or estimated from the similar offers.\n"
         f"- Language: write the title, scope of work, terms and line descriptions in the language of the request, and give it as language.\n"
@@ -115,7 +131,11 @@ def format_quote_request(message: str, extracted_fields: list[ExtractedField]) -
 # Prices are given without the margin, as the model sees them in the catalogue and the business rules.
 def format_quote_adjustment(quote: Quote, feedback: str, extra_margin_percentage: float) -> str:
     margin_factor = _get_margin_factor(extra_margin_percentage)
-    product_lines = [f"- {line.product_reference} × {line.quantity:g}" for line in quote.lines if line.type == QuoteLineType.PRODUCT]
+    product_lines = [
+        f"- {line.product_reference} × {line.quantity:g}" + (f" | details: {line.details}" if line.details else "")
+        for line in quote.lines
+        if line.type == QuoteLineType.PRODUCT
+    ]
     extra_lines = [
         f"- {line.description} | {line.quantity:g} {line.unit} | {CURRENCY} {line.unit_price / margin_factor:.2f}"
         for line in quote.lines
@@ -124,6 +144,9 @@ def format_quote_adjustment(quote: Quote, feedback: str, extra_margin_percentage
     return (
         f"Current quote:\n"
         f"- Customer: {quote.customer}\n"
+        f"- Company: {quote.company}\n"
+        f"- Contact: {quote.contact}\n"
+        f"- Salutation: {quote.salutation}\n"
         f"- Title: {quote.title}\n"
         f"- Scope of work: {quote.scope_of_work}\n"
         f"- Terms: {quote.terms}\n"
@@ -166,6 +189,9 @@ def parse_quote_result(result: dict[str, Any], products: list[Product], extra_ma
     ]
     return Quote(
         customer=llm_quote.customer,
+        company=llm_quote.company,
+        contact=llm_quote.contact,
+        salutation=llm_quote.salutation,
         title=llm_quote.title,
         scope_of_work=llm_quote.scope_of_work,
         terms=llm_quote.terms,
@@ -179,9 +205,13 @@ def _get_margin_factor(extra_margin_percentage: float) -> float:
     return 1 + extra_margin_percentage / 100
 
 
+# The spec (colours, material, delivery time, ...) goes along, so the quote can describe the product and answer questions about it.
 def _describe_product(product: Product) -> str:
     price = f"{CURRENCY} {product.unit_price:.2f} per {product.unit or 'unit'}" if product.unit_price is not None else "no price"
-    return f"- {product.product_reference} | {product.description} | {price}"
+    spec = "; ".join(f"{key}: {value}" for key, value in product.spec.items())
+    # Line breaks in a description only shape the PDF; the prompt lists one product per line.
+    description = " ".join(product.description.split())
+    return f"- {product.product_reference} | {description} | {price}" + (f" | {spec}" if spec else "")
 
 
 # A reference the catalogue does not know or cannot price is kept as an extra line at 0, so the person reviewing the quote notices it.
@@ -195,6 +225,7 @@ def _to_product_line(product_line: _LLMProductLine, product: Product | None, mar
             unit="",
             base_unit_price=0,
             margin_factor=margin_factor,
+            details=product_line.details.strip(),
         )
     return _build_line(
         line_type=QuoteLineType.PRODUCT if product.unit_price is not None else QuoteLineType.EXTRA,
@@ -204,6 +235,7 @@ def _to_product_line(product_line: _LLMProductLine, product: Product | None, mar
         unit=product.unit,
         base_unit_price=product.unit_price or 0,
         margin_factor=margin_factor,
+        details=product_line.details.strip(),
     )
 
 
@@ -215,6 +247,7 @@ def _build_line(
     unit: str,
     base_unit_price: float,
     margin_factor: float,
+    details: str = "",
 ) -> QuoteLine:
     unit_price = round(base_unit_price * margin_factor, PRICE_DECIMALS)
     return QuoteLine(
@@ -225,4 +258,5 @@ def _build_line(
         unit=unit,
         unit_price=unit_price,
         total=round(unit_price * quantity, PRICE_DECIMALS),
+        details=details,
     )

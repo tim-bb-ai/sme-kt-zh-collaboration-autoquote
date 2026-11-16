@@ -11,12 +11,15 @@ from auto_quote.controllers.follow_up_configuration import DEFAULT_FOLLOW_UP_CON
 from auto_quote.controllers.product import ProductController
 from auto_quote.controllers.quote import QuoteController
 from auto_quote.controllers.quote_configuration import DEFAULT_QUOTE_CONFIGURATION, QuoteConfigurationController
+from auto_quote.controllers.quote_template import QuoteTemplateController
 from auto_quote.controllers.retrieval import RetrievalController
 from auto_quote.documents.reader.document_reader import DocumentType
 from auto_quote.documents.reader.docx import DOCXDocumentReader
 from auto_quote.documents.reader.pdf import PDFDocumentReader
 from auto_quote.documents.reader.txt import TXTDocumentReader
+from auto_quote.documents.renderer.quote_renderer import QuoteRenderer
 from auto_quote.documents.renderer.reportlab import ReportLabQuoteRenderer
+from auto_quote.documents.renderer.template_reportlab import TemplateQuoteRenderer
 from auto_quote.embeddings.openai import OpenAIEmbeddingModel
 from auto_quote.llm.openai import OpenAILLM
 from auto_quote.models.branding import Branding
@@ -28,6 +31,7 @@ from auto_quote.models.json_file.follow_up_configuration import JSONFileFollowUp
 from auto_quote.models.json_file.indexed_document import JSONFileIndexedDocumentDatabase
 from auto_quote.models.json_file.product import JSONFileProductDatabase
 from auto_quote.models.json_file.quote_configuration import JSONFileQuoteConfigurationDatabase
+from auto_quote.models.quote_template import QuoteTemplate
 from auto_quote.server import create_app
 
 
@@ -35,6 +39,7 @@ BACKEND_FOLDER = Path(__file__).resolve().parents[2]
 ROOT_FOLDER = BACKEND_FOLDER.parent
 DATA_FOLDER = BACKEND_FOLDER / "data"
 BRANDING_FOLDER = ROOT_FOLDER / "branding"
+QUOTE_TEMPLATE_FOLDER = DATA_FOLDER / "quote_template"
 ENV = os.getenv("ENV", "local")
 
 load_dotenv(ROOT_FOLDER / f".env.{ENV}")
@@ -91,13 +96,24 @@ document_index_controller = DocumentIndexController(
 retrieval_controller = RetrievalController(
     indexed_document_database=indexed_document_database, document_vector_store=document_vector_store, embedding_model=embedding_model
 )
+# A company's own quote layout, if there is one (see QuoteTemplate); otherwise the default layout with the branding.
+quote_template_file = QUOTE_TEMPLATE_FOLDER / "template.json"
+quote_renderer: QuoteRenderer
+if quote_template_file.is_file():
+    quote_template = QuoteTemplate.model_validate_json(quote_template_file.read_text(encoding="utf-8"))
+    quote_renderer = TemplateQuoteRenderer(template=quote_template, template_folder=QUOTE_TEMPLATE_FOLDER)
+    quote_completer = QuoteTemplateController(template=quote_template, template_folder=QUOTE_TEMPLATE_FOLDER).complete_quote
+else:
+    quote_renderer = ReportLabQuoteRenderer(branding=branding, logo=branding_logo, font_files=branding_font_files)
+    quote_completer = None
 quote_controller = QuoteController(
     quote_configuration_database=quote_configuration_database,
     product_database=product_database,
     document_file_storage=document_file_storage,
     document_readers=document_readers,
-    quote_renderer=ReportLabQuoteRenderer(branding=branding, logo=branding_logo, font_files=branding_font_files),
+    quote_renderer=quote_renderer,
     llm=llm,
+    quote_completer=quote_completer,
 )
 extraction_database = JSONFileExtractionDatabase(json_file_path=DATA_FOLDER / "extractions.json")
 extraction_controller = ExtractionController(

@@ -26,6 +26,8 @@ class QuoteLine(BaseModel):
     unit: str
     unit_price: float
     total: float
+    # Customer-specific addition printed below the catalogue description, e.g. the finishing.
+    details: str = ""
 
 
 class Quote(BaseModel):
@@ -37,3 +39,9 @@ class Quote(BaseModel):
     total: float
     # Quotes stored before the language was recorded are read as English.
     language: QuoteLanguage = QuoteLanguage.ENGLISH
+    # Filled for a quote template (see QuoteTemplate); empty in quotes stored before, which the default layout does not need.
+    company: str = ""
+    contact: str = ""
+    salutation: str = ""
+    number: str = ""
+    address: list[str] = []

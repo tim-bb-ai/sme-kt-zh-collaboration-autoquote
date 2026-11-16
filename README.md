@@ -358,6 +358,14 @@ files must be updated by hand (or deleted).
   The logo must be a PNG (the PDF library cannot draw SVG). Optional fields: `logoHeightMm` (logo height on the quote PDF, default 14),
   `logoHeaderHeightPx` (logo height in the app header, default 20) and `font` (`family` plus `.ttf` files by weight, paths relative to
   `branding/`), which replaces the app and PDF fonts. `branding/fonts/` is git-ignored for licensed fonts; without the files the defaults stay. The quote PDF layout is `ReportLabQuoteRenderer` in `backend/src/auto_quote/documents/renderer/reportlab.py`.
+- **Own quote layout** (optional): to reproduce a company's existing quotes exactly, put a `template.json` in `backend/data/quote_template/`
+  (git-ignored, with its fonts and images next to it). It is described by `QuoteTemplate` in `backend/src/auto_quote/models/quote_template.py`:
+  fixed texts, header and footer images, a TrueType font (plus an optional medium weight for the title, table header and notice),
+  horizontal lines, a coloured bar behind the table header, the positions of every element in mm, a quote number counter and a customer file
+  (CSV) for the postal address and the salutation. The quote PDF is then drawn by `TemplateQuoteRenderer`
+  (`backend/src/auto_quote/documents/renderer/template_reportlab.py`) and continues on further pages when needed; the model only supplies
+  the data (company, contact, salutation, title, positions with an optional `details` line). Quotes made in Word are set with kerning;
+  `backend/scripts/build_font_metrics.py` extracts the font's kerning pairs (`uv run --with fonttools python scripts/build_font_metrics.py <font.ttf>`).
 - **Retrieval**: how many similar cases are used (`SIMILAR_DOCUMENTS_LIMIT`) is in `backend/src/auto_quote/controllers/retrieval.py`.
   Embeddings are stored with ChromaDB, embedded in the backend (no Chroma server); the implementation is
   `backend/src/auto_quote/models/chroma/document_vector.py`.

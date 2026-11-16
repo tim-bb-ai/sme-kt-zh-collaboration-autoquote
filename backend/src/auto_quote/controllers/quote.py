@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import date
 
 from loguru import logger
@@ -37,6 +38,8 @@ class QuoteController:
         document_readers: dict[DocumentType, DocumentReader],
         quote_renderer: QuoteRenderer,
         llm: LLM,
+        # Adds what the model cannot know (e.g. the quote number and the address of a quote template); gets the new and the previous quote.
+        quote_completer: Callable[[Quote, Quote | None], Quote] | None = None,
     ):
         self.quote_configuration_database = quote_configuration_database
         self.product_database = product_database
@@ -44,6 +47,7 @@ class QuoteController:
         self.document_readers = document_readers
         self.quote_renderer = quote_renderer
         self.llm = llm
+        self.quote_completer = quote_completer
 
     async def build_quote(self, message: str, extracted_fields: list[ExtractedField], similar_documents: list[SimilarDocument]) -> Quote:
         return await self._generate_quote(
@@ -87,10 +91,13 @@ class QuoteController:
             tool=build_quote_tool(),
         )
         try:
-            return parse_quote_result(result=result, products=products, extra_margin_percentage=quote_configuration.extra_margin_percentage)
+            new_quote = parse_quote_result(
+                result=result, products=products, extra_margin_percentage=quote_configuration.extra_margin_percentage
+            )
         except ValidationError as e:
             logger.error(f"Error parsing the quote returned by the model: {e}")
             raise LLMResponseError("The model returned a quote that does not match the build_quote tool") from e
+        return self.quote_completer(new_quote, quote) if self.quote_completer is not None else new_quote
 
     async def _read_similar_offers(self, similar_documents: list[SimilarDocument]) -> str:
         offer_texts = []

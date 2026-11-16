@@ -19,7 +19,7 @@ DEFAULT_BUSINESS_RULES = (
 DEFAULT_QUOTE_CONFIGURATION = QuoteConfigurationInput(extra_margin_percentage=0, business_rules=DEFAULT_BUSINESS_RULES)
 
 PREVIEW_REQUEST = "[customer message and extracted details]"
-PREVIEW_PRODUCTS = "[matching products from the catalogue: reference, description, unit, unit price]"
+PREVIEW_PRODUCTS = "[matching products from the catalogue: reference, description, unit, unit price, spec]"
 PREVIEW_SIMILAR_OFFERS = "[similar past offers]"
 
 
